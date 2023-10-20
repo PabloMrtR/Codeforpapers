@@ -1,0 +1,18 @@
+#####PIE-CHART ///// GRÁFICA DE CIRCULITO####
+library(ggplot2)
+######los datos entran en un csv de 2 columnas: la primera con los nombres de los genes y la 2nda con el número que hay de estos###
+data<-read.csv("subsystem.csv", sep=";")
+head(data)
+
+### con nom creo una columna con los valores como caracteres para luego crear una columna nueva en el data frame que combine el nombre con los valores y salga guay para la leyenda
+nom<-as.character(data[,2])
+data$Subsystem_Features <- paste(data$Subsystem_Feature, "(",nom,")")
+
+### crea la grafica llamada graf pero de barras normal, metiendole en "y" y "fill" los valores que quiero del data frame. El resto ni zorra.
+graf<- ggplot(data, aes(x="", y=Subsystem_Category_Distribution, fill=Subsystem_Features))+geom_bar(width = 1, stat = "identity")
+
+#### graf es la grafica normal que hace antes, coord_polar tal cual para que la ponga redonda, theme tal cual hace que se quiten los numeros del eje x, las lineas etc, labs son los nombres de los ejes y scale fille manual son 25 colores a mano que he metido como un tonto
+pdf("pie_chart_genes_bien.pdf", height=8,width=12)
+pie <- graf + coord_polar("y", start=0) + theme_classic() +theme(axis.text.x=element_blank(), axis.line = element_blank()) + labs(x = NULL, y = NULL, fill = NULL)+ scale_fill_manual(values=c("cadetblue3", "burlywood4", "chartreuse3", "chocolate3", "midnightblue", "cornflowerblue", "cornsilk3", "darkgoldenrod3", "royalblue1", "darkgray", "darkolivegreen4", "darkorchid3", "darkseagreen3", "firebrick1",  "goldenrod1", "deeppink3", "coral3", "lightslateblue", "hotpink2", "lightgreen", "lightsalmon1", "mediumpurple3", "limegreen", "lightyellow", "red3"))
+pie
+dev.off()
