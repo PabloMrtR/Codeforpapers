@@ -1,0 +1,105 @@
+# Cargar las librerías necesarias
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(ggarrow)
+#NOTA: para guardar en formato svg, quizás es necesario instalar el paquete svglite, que aunque está en el propio ggplot2 a veces no está instalado.
+
+# Definir la función para dibujar las secuencias de ADN y sus ORFs
+dibujar_adn <- function(orfs_df, output_pdf = "secuencias_adn6.pdf",
+                        output_svg = "secuencias_adn6.svg") {
+  
+  # Validar que el DataFrame contenga todas las columnas necesarias
+  required_cols <- c("sequence_id", "direccion", "inicio", "longitud", 
+                     "truncado_inicio", "truncado_final", "longitud_adn", "nombre_orf")
+  if(!all(required_cols %in% colnames(orfs_df))) {
+    stop(paste("El DataFrame debe contener las columnas:", 
+               paste(required_cols, collapse = ", ")))
+  }
+  
+  # Crear un DataFrame único para las secuencias de ADN con sus longitudes
+  sequences_df <- orfs_df %>%
+    select(sequence_id, longitud_adn) %>%
+    distinct() %>%
+    mutate(y_seq = rev(row_number()) * 1.5) # Mantener orden y asignar posición descendente
+  
+  # Unir la información de las secuencias con los ORFs
+  orfs_df <- orfs_df %>%
+    left_join(sequences_df, by = "sequence_id") %>%
+    mutate(
+      # Corregir la lógica de x_start y x_end para direcciones
+      x_start = inicio,
+      x_end = ifelse(direccion == "derecha", inicio + longitud, inicio - longitud),
+      y = y_seq + 0.2 # Posicionar los ORFs ligeramente por encima de la secuencia
+    )
+  
+  # Crear el gráfico
+  p <- ggplot() +
+    # Dibujar las secuencias de ADN como líneas horizontales
+    geom_segment(data = sequences_df, 
+                 aes(x = 0, y = y_seq, xend = longitud_adn, yend = y_seq), 
+                 color = "black", size = 0.2) +
+    
+    # Dibujar los ORFs con flechas
+    geom_arrow_segment(data = orfs_df, 
+                       aes(x = x_start, y = y_seq, xend = x_end, yend = y_seq),
+                       arrow_head = arrow_head_minimal(),
+                       color = "#3ea2ce", size = 5) +
+    
+    # Indicadores de truncamiento al inicio
+    geom_segment(data = orfs_df %>% filter(truncado_inicio),
+                 aes(x = x_start, y = y_seq, xend = x_start, yend = y_seq + 0.2), 
+                 color = "#3ea2ce", size = 1) +
+    geom_segment(data = orfs_df %>% filter(truncado_inicio),
+                 aes(x = x_start, y = y_seq, xend = x_start, yend = y_seq - 0.2), 
+                 color = "#3ea2ce", size = 1) +
+    
+    # Indicadores de truncamiento al final
+    geom_segment(data = orfs_df %>% filter(truncado_final),
+                 aes(x = x_end, y = y_seq, xend = x_end, yend = y_seq + 0.2), 
+                 color = "#3ea2ce", size = 1) +
+    geom_segment(data = orfs_df %>% filter(truncado_final),
+                 aes(x = x_end, y = y_seq, xend = x_end, yend = y_seq - 0.2), 
+                 color = "#3ea2ce", size = 1) +
+    
+    # Ajustar límites del eje Y
+    ylim(0, max(sequences_df$y_seq) + 2) +
+    # Ajustar límites del eje X automáticamente
+    scale_x_continuous(expand = expansion(mult = c(0.1, 0.05))) +
+    
+    # Temas y títulos
+    theme_minimal() +
+    theme(
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+    ) +
+    ggtitle("Representación de Secuencias de ADN y ORFs")
+  
+  # Añadir etiquetas para identificar cada secuencia de ADN a la izquierda de la línea
+  p <- p + 
+    geom_text(data = sequences_df, 
+              aes(x = -0.05 * min(longitud_adn), y = y_seq, label = sequence_id),  # Posicionar a la izquierda
+              hjust = 1, vjust = 0.5, size = 4, color = "black", fontface = "bold")  # Ajuste de alineación y tamaño
+  
+  # Añadir etiquetas para identificar los nombres de los ORFs sobre cada flecha
+  p <- p + 
+    geom_text(data = orfs_df, 
+              aes(x = (x_start + x_end) / 2, y = y_seq, label = nombre_orf),  # Centrar sobre la flecha
+              hjust = 0.5, vjust = 0.5, size = 3, color = "white",
+              fontface = "bold.italic")  # Ajuste de alineación y tamaño y fuente
+  
+  # Guardar la gráfica en PDF
+  ggsave(filename = output_pdf, plot = p, device = "pdf", width = 8, height = 6)
+  # Guardar la gráfica en SVG
+  ggsave(filename = output_svg, plot = p, device = "svg", width = 8, height = 6)
+}
+
+# Leer el archivo CSV
+orfs_df <- read.csv("orf_prueba.csv", sep = ";")
+
+# Llamar a la función para graficar y guardar el archivo
+dibujar_adn(orfs_df, output_pdf = "secuencias_adn6.pdf",
+            output_svg = "secuencias_adn6.svg")
